@@ -1,0 +1,86 @@
+
+<!doctype html>
+<head>
+  <script>
+    const API_ENDPOINT = "https://kinesis-data-pipeline.webskate101.com";
+  </script>
+  <style>
+    .input-row {
+      margin: 10px;
+    }
+    .input-row label {
+      display: inline-block;
+      width: 120px;
+    }
+  </style>
+</head>
+<body>
+  <div class="input-row">
+    <label>card_id</label>
+    <input id="card-id" value="6112230235963392">
+  </div>
+  <div class="input-row">
+    <label>correct</label>
+    <select id="correct">
+      <option value="true">True</option>
+      <option value="false">False</option>
+    </select>
+  </div>
+  <div class="input-row">
+    <label>timestamp</label>
+    <input id="timestamp" value="1421633440">
+  </div>
+  <div class="input-row">
+    <label>user</label>
+    <input id="user" value="112939906447191940303">
+  </div>
+  <div class="input-row">
+    <label>Sumission count</label>
+    <span id="submission-count">0</span>
+  </div>
+  <div>
+    <button id="submit-button">submit</button>
+    <button id="refresh-data-button">refresh data</button>
+  </div>
+
+  <script>
+    function randomDigits(n) {
+      return String(Math.floor(Math.random() * 10**n));
+    }
+
+    function initFields() {
+      document.querySelector('#timestamp').value = Math.floor(Date.now()/1000);
+      document.querySelector('#user').value = randomDigits(7) + randomDigits(7) + randomDigits(7);
+      document.querySelector('#card-id').value = randomDigits(5) + randomDigits(5) + randomDigits(6);
+      document.querySelector('#correct').selectedIndex = Math.floor(Math.random() * 2);
+    }
+
+    let submissionCount = 0;
+    initFields();
+
+    const refresdDataButton = document.querySelector('#refresh-data-button');
+    refresdDataButton.addEventListener('click', () => {
+      initFields();
+    });
+
+    const submitButton = document.querySelector('#submit-button');
+    submitButton.addEventListener('click', async () => {
+      const cardId = document.querySelector('#card-id').value;
+      const correct = document.querySelector('#correct').value;
+      const timestamp = document.querySelector('#timestamp').value;
+      const user = document.querySelector('#user').value;
+      const response = await fetch(`${API_ENDPOINT}/responses`, {
+        method: "post",
+        body: JSON.stringify({
+          card_key: ['Card', cardId],
+          correct,
+          timestamp,
+          user,
+        })});
+      console.log(await response.json());
+      document.querySelector('#submission-count').innerHTML = ++submissionCount;
+      initFields();
+    });
+  </script>
+</body>
+

@@ -1,0 +1,130 @@
+<!doctype html>
+<head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+</head>
+<body>
+  <h1>Flashcards Dev Client</h1>
+
+  <section>
+    <h2>Login</h2>
+    <div><button id="login-button">Login</button></div>
+    <div>Code: <span id="code-span">Not available</span></div>
+    <div>Id Token: <span id="id-token-span">Not available</span></div>
+  </section>
+
+  <section id="api-calls-section" style="display:none">
+    <h2>Post Deck</h2>
+    <div>
+      <label>
+        Name:
+        <input id="post-decks-name-input">
+        <button id="post-decks-submit-button">Submit</button>
+      </label>
+    </div>
+    <div id="post-decks-output"></div>
+
+    <h2>Get Decks</h2>
+    <div>
+      <button id="get-decks-button">Get Decks</button>
+    </div>
+    <div>
+      <table id="get-decks-table"></table>
+    </div>
+
+    <section id="cards-section" style="display:none">
+      <h2>Post Card</h2>
+      <div>
+        <label>Front: <input id="card-front-input" type="text"></label>
+      </div>
+      <div>
+        <label>Back: <input id="card-back-input" type="text"></label>
+      </div>
+      <div>
+        <button id="post-cards-submit-button">Submit</button>
+      </div>
+      <div id="post-cards-output"></div>
+    </section>
+
+  </section>
+
+  <script>
+    const API_ROOT = 'https://dynamodb-rest-api.webskate101.com';
+    const COGNITO_ROOT = 'https://joans-first-domain.auth.eu-west-1.amazoncognito.com';
+    const COGNITO_CLIENT_ID = '44bn8u497hsdraoa7m1r0vt4b5';
+    const STATIC_SITE_ROOT = 'http://localhost:8080';
+
+
+    $(async () => {
+      // This is shared globally by the API calls and is set when the auth code
+      // is redeemed in login phase.
+      let idToken;
+
+      $('#login-button').click(() => {
+        window.location = `${COGNITO_ROOT}/login?client_id=${COGNITO_CLIENT_ID}&response_type=code&scope=email+openid+phone&redirect_uri=http%3A%2F%2Flocalhost:8080%2Fdynamodb_rest_api.html`;
+      });
+
+      const code = URL.parse(window.location).searchParams.get('code');
+      if (code) {
+        $('#code-span').text(code);
+        const response = await jQuery.post(`${COGNITO_ROOT}/oauth2/token`, {
+          grant_type: 'authorization_code',
+          client_id: COGNITO_CLIENT_ID,
+          redirect_uri: `${STATIC_SITE_ROOT}/dynamodb_rest_api.html`,
+          code
+        });
+        idToken = response.id_token;
+        $('#id-token-span').text('Available');
+        $('#api-calls-section').show();
+      }
+
+      $('#post-decks-submit-button').click(async () => {
+        const response = await jQuery.post({
+          url: `${API_ROOT}/decks`,
+          headers: {
+            Authorization: idToken
+          },
+          data: {
+            name: $('#post-decks-name-input').val()
+          }
+        });
+        $('#post-decks-output').text(JSON.stringify(response));
+      });
+
+      $('#get-decks-button').click(async () => {
+        const response = await jQuery.get({
+          url: `${API_ROOT}/decks`,
+          headers: {
+            Authorization: idToken
+          }
+        });
+
+        $('#get-decks-table').empty();
+        response.decks.Items.forEach((item) => {
+          const tr = $('<tr></tr>');
+          const radioButton = $('<input type="radio" name="deck">').val(
+            JSON.stringify({deck_pk: item.username, deck_sk: item.uid}));
+          tr.append($('<td></td>').append(radioButton));
+          tr.append(`<td>${item.deck_name}</td>`);
+          $('#get-decks-table').append(tr);
+        });
+
+        $('#cards-section').show();
+      });
+
+      $('#post-cards-submit-button').click(async () => {
+        const data = JSON.parse($('input[name="deck"]:checked').val());
+        data.card_front = $('#card-front-input').val();
+        data.card_back = $('#card-back-input').val();
+        const response = await jQuery.post({
+          url: `${API_ROOT}/cards`,
+          headers: {
+            Authorization: idToken
+          },
+          data
+        });
+        $('#post-cards-output').text(JSON.stringify(response));
+
+      });
+    });
+  </script>
+</body>
