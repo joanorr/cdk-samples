@@ -50,4 +50,9 @@ describe('The Certificates stack', () => {
       Value: {Ref: certName,},
     });
   });
+
+  test('passes snapshot tests', () => {
+    // Detect unexpected regressions from refactoring.
+    expect(template.toJSON()).toMatchSnapshot();
+  });
 });
