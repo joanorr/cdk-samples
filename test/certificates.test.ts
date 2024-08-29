@@ -52,7 +52,8 @@ describe('The Certificates stack', () => {
   });
 
   test('passes snapshot tests', () => {
-    // Detect unexpected regressions from refactoring.
+    // Detect unexpected regressions from refactoring. Expect this test to fail
+    // when any changes are made to fearures.
     expect(template.toJSON()).toMatchSnapshot();
   });
 });
