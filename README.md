@@ -14,18 +14,21 @@ The project contains the following stacks:
 
 * **EC2s in VPC:** Configure a VPC with public and private subnets, with an EC2
   instance in each private subnet and an internet-facing load balancer in the
-  public subnets.
+  public subnets. See the [CDK file](./lib/ec2s-in-vpc.ts).
 
 * **DynamoDb REST APIs:** A REST API published on API Gateway, to manage
   CRUD operations on entities stoired in DynamoDb. Also uses Cognito user pools
-  for authetication.
+  for authetication. See the [CDK file](./lib/dynamodb-rest-api.ts).
 
 * **Kinesis Data Pipeline:** A data pipeline receiving data from an API Gateway
   endpoint, sending it to a Kinesis Data Stream, which is polled by Kinesis
-  Firehose, to write data to an S3 bucket.
+  Firehose, to write data to an S3 bucket. See the
+  [CDK file](./lib/kinesis-data-pipeline.ts).
 
 * **CloudFormation YAML Files:** Some samples of setting up services with plain
   CloudFormation YAML.
+  See [setting up the VPC](./cloudformation-samples/vpc-with-subnets.yaml) and
+  [adding the EC2s](./cloudformation-samples/two-ec2s-in-private-subnet.yaml).
 
 
 ## Deploying the Stacks
