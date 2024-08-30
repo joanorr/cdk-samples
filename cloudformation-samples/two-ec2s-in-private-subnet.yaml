@@ -1,14 +1,27 @@
 ---
 Resources:
-  # Security groups
-  AllowHTTPSecurityGroup:
+  # Security groups. The load balancer can receive HTTP requests from anywhere;
+  # the EC2s can only receive HTTP from the load balancer.
+  LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow HTTP from anywhere
-      GroupName: AllowHTTP
+      GroupName: CloudFormationSamplesLoadBalancerSG
       SecurityGroupIngress:
         - CidrIp: 0.0.0.0/0
           Description: HTTP from anywhere
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+      VpcId: !ImportValue CFSamplesVpcId
+  Ec2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP from the load balancer
+      GroupName: CloudFormationSamplesEc2SG
+      SecurityGroupIngress:
+        - Description: HTTP from anywhere
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
           IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -18,11 +31,10 @@ Resources:
   PrivateSubnet1EC2:
     Type: AWS::EC2::Instance
     Properties:
-      # AvailabilityZone: eu-west-1a
       ImageId: ami-0b815cfb867003088
       InstanceType: t2.micro
       SecurityGroupIds:
-        - !Ref AllowHTTPSecurityGroup
+        - !Ref Ec2SecurityGroup
       SubnetId: !ImportValue CFSamplesPrivateSubnet1Id
       Tags:
         - Key: Name
@@ -38,11 +50,10 @@ Resources:
   PrivateSubnet2EC2:
     Type: AWS::EC2::Instance
     Properties:
-      # AvailabilityZone: eu-west-1b
       ImageId: ami-0b815cfb867003088
       InstanceType: t2.micro
       SecurityGroupIds:
-        - !Ref AllowHTTPSecurityGroup
+        - !Ref Ec2SecurityGroup
       SubnetId: !ImportValue CFSamplesPrivateSubnet2Id
       Tags:
         - Key: Name
@@ -65,7 +76,7 @@ Resources:
       Name: LoadBalancer
       Scheme: internet-facing
       SecurityGroups:
-        - !Ref AllowHTTPSecurityGroup
+        - !Ref LoadBalancerSecurityGroup
       Subnets:
         - !ImportValue CFSamplesPublicSubnet1Id
         - !ImportValue CFSamplesPublicSubnet2Id
