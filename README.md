@@ -1,7 +1,7 @@
 # CDK Samples
 
 This project contains some sample  uses of
-[AWS CDK](https://aws.amazon.com/cdk/).
+[AWS CDK](https://aws.amazon.com/cdk/) and CloudFormation.
 
 
 ## Stacks
@@ -9,7 +9,8 @@ This project contains some sample  uses of
 The project contains the following stacks:
 
 * **Certificates:** A shared stack which sets up certificates used by some of
-  the other stacks.
+  the other stacks. See the [CDK file](./lib/certificates.ts) and its
+  [tests](./test/certificates.test.ts).
 
 * **EC2s in VPC:** Configure a VPC with public and private subnets, with an EC2
   instance in each private subnet and an internet-facing load balancer in the
@@ -22,6 +23,9 @@ The project contains the following stacks:
 * **Kinesis Data Pipeline:** A data pipeline receiving data from an API Gateway
   endpoint, sending it to a Kinesis Data Stream, which is polled by Kinesis
   Firehose, to write data to an S3 bucket.
+
+* **CloudFormation YAML Files:** Some samples of setting up services with plain
+  CloudFormation YAML.
 
 
 ## Deploying the Stacks
