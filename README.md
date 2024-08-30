@@ -16,7 +16,8 @@ The project contains the following stacks:
   public subnets.
 
 * **DynamoDb REST APIs:** A REST API published on API Gateway, to manage
-  CRUD operations on entities stoired in DynamoDb.
+  CRUD operations on entities stoired in DynamoDb. Also uses Cognito user pools
+  for authetication.
 
 * **Kinesis Data Pipeline:** A data pipeline receiving data from an API Gateway
   endpoint, sending it to a Kinesis Data Stream, which is polled by Kinesis
