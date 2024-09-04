@@ -129,13 +129,13 @@ Resources:
                 Action:
                   - s3:ListBucket
                 Resource: !Sub
-                  - 'arn:aws:s3:::${BucketName}'
+                  - "arn:aws:s3:::${BucketName}"
                   - BucketName: !ImportValue StagingWebsiteBucket
               - Effect: Allow
                 Action:
                   - s3:PutObject
                 Resource: !Sub
-                  - 'arn:aws:s3:::${BucketName}/*'
+                  - "arn:aws:s3:::${BucketName}/*"
                   - BucketName: !ImportValue StagingWebsiteBucket
 
   PushWebsiteToProdServiceRole:
@@ -173,13 +173,13 @@ Resources:
                 Action:
                   - s3:ListBucket
                 Resource: !Sub
-                  - 'arn:aws:s3:::${BucketName}'
+                  - "arn:aws:s3:::${BucketName}"
                   - BucketName: !ImportValue ProdWebsiteBucket
               - Effect: Allow
                 Action:
                   - s3:PutObject
                 Resource: !Sub
-                  - 'arn:aws:s3:::${BucketName}/*'
+                  - "arn:aws:s3:::${BucketName}/*"
                   - BucketName: !ImportValue ProdWebsiteBucket
 
   Pipeline:
@@ -196,7 +196,7 @@ Resources:
             - Name: GetProjectFromGitHub
               ActionTypeId:
                 Category: Source
-                Version: '1'
+                Version: "1"
                 Owner: AWS
                 Provider: CodeStarSourceConnection
               OutputArtifacts:
@@ -211,7 +211,7 @@ Resources:
             - Name: BuildTheWebsite
               ActionTypeId:
                 Category: Build
-                Version: '1'
+                Version: "1"
                 Owner: AWS
                 Provider: CodeBuild
               InputArtifacts:
@@ -225,7 +225,7 @@ Resources:
             - Name: PushToStaging
               ActionTypeId:
                 Category: Build
-                Version: '1'
+                Version: "1"
                 Owner: AWS
                 Provider: CodeBuild
               InputArtifacts:
@@ -238,14 +238,14 @@ Resources:
               RunOrder: 1
               ActionTypeId:
                 Category: Approval
-                Version: '1'
+                Version: "1"
                 Owner: AWS
                 Provider: Manual
             - Name: PushToProd
               RunOrder: 2
               ActionTypeId:
                 Category: Build
-                Version: '1'
+                Version: "1"
                 Owner: AWS
                 Provider: CodeBuild
               InputArtifacts:
@@ -259,8 +259,7 @@ Resources:
             Push:
               - Branches:
                   Includes:
-                    - 'master'
-
+                    - "master"
 
   BuildWebsite:
     Type: AWS::CodeBuild::Project
