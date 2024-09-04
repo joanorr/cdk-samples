@@ -1,0 +1,322 @@
+---
+
+Parameters:
+  GitHubCodeConnectionArn:
+    Description: The ARN of the CodeConnection resource for my GitHuib account.
+    Type: String
+  GitHubRepositoryId:
+    Description: The GitHub repository which holds the project to be built.
+    Type: String
+  WebsiteBuilderDockerImageUri:
+    Description: The URI of the ECR Docker image for the website builder.
+    Type: String
+
+Resources:
+  ArtifactStoreBucket:
+    Type: AWS::S3::Bucket
+
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: PipelinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub "${ArtifactStoreBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - "codestar-connections:UseConnection"
+                Resource: !Ref GitHubCodeConnectionArn
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource:
+                  - !GetAtt BuildWebsite.Arn
+                  - !GetAtt PushWebsiteToStaging.Arn
+                  - !GetAtt PushWebsiteToProd.Arn
+
+  BuildWebsiteServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: BuildWebsiteServiceRolePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*:*
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                # See https://stackoverflow.com/questions/38587325/aws-ecr-getauthorizationtoken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchGetImage
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/website-builder
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - !Sub "${ArtifactStoreBucket.Arn}/*"
+
+  PushWebsiteToStagingServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: PushWebsiteToStagingServiceRolePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*:*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "${ArtifactStoreBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub
+                  - 'arn:aws:s3:::${BucketName}'
+                  - BucketName: !ImportValue StagingWebsiteBucket
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub
+                  - 'arn:aws:s3:::${BucketName}/*'
+                  - BucketName: !ImportValue StagingWebsiteBucket
+
+  PushWebsiteToProdServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: PushWebsiteToProdServiceRolePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*:*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "${ArtifactStoreBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub
+                  - 'arn:aws:s3:::${BucketName}'
+                  - BucketName: !ImportValue ProdWebsiteBucket
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub
+                  - 'arn:aws:s3:::${BucketName}/*'
+                  - BucketName: !ImportValue ProdWebsiteBucket
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      PipelineType: V2
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactStoreBucket
+      RoleArn: !GetAtt PipelineRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GetProjectFromGitHub
+              ActionTypeId:
+                Category: Source
+                Version: '1'
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                ConnectionArn: !Ref GitHubCodeConnectionArn
+                FullRepositoryId: !Ref GitHubRepositoryId
+                BranchName: "master"
+                OutputArtifactFormat: "CODE_ZIP"
+        - Name: Build
+          Actions:
+            - Name: BuildTheWebsite
+              ActionTypeId:
+                Category: Build
+                Version: '1'
+                Owner: AWS
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: CompiledWebsite
+              Configuration:
+                ProjectName: !Ref BuildWebsite
+        - Name: Stage
+          Actions:
+            - Name: PushToStaging
+              ActionTypeId:
+                Category: Build
+                Version: '1'
+                Owner: AWS
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: CompiledWebsite
+              Configuration:
+                ProjectName: !Ref PushWebsiteToStaging
+        - Name: Prod
+          Actions:
+            - Name: ManualApproval
+              RunOrder: 1
+              ActionTypeId:
+                Category: Approval
+                Version: '1'
+                Owner: AWS
+                Provider: Manual
+            - Name: PushToProd
+              RunOrder: 2
+              ActionTypeId:
+                Category: Build
+                Version: '1'
+                Owner: AWS
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: CompiledWebsite
+              Configuration:
+                ProjectName: !Ref PushWebsiteToProd
+      Triggers:
+        - ProviderType: CodeStarSourceConnection
+          GitConfiguration:
+            SourceActionName: GetProjectFromGitHub
+            Push:
+              - Branches:
+                  Includes:
+                    - 'master'
+
+
+  BuildWebsite:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Source:
+        Type: CODEPIPELINE
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt BuildWebsiteServiceRole.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Ref WebsiteBuilderDockerImageUri
+        # Required in order for the service role permissions to be used to pull
+        # the Docker image.
+        # See https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-codebuild-project-environment.html#cfn-codebuild-project-environment-imagepullcredentialstype
+        ImagePullCredentialsType: SERVICE_ROLE
+
+  PushWebsiteToStaging:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub
+          - |
+            version: 0.2
+            phases:
+              build:
+                commands:
+                  - aws s3 sync . s3://${WebsiteBucket} --delete
+          - WebsiteBucket: !ImportValue StagingWebsiteBucket
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt PushWebsiteToStagingServiceRole.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+
+  PushWebsiteToProd:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub
+          - |
+            version: 0.2
+            phases:
+              build:
+                commands:
+                  - aws s3 sync . s3://${WebsiteBucket} --delete
+          - WebsiteBucket: !ImportValue ProdWebsiteBucket
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt PushWebsiteToProdServiceRole.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0

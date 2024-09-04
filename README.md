@@ -29,6 +29,8 @@ The project contains the following stacks:
   CloudFormation YAML.
   See [setting up the VPC](./cloudformation-samples/vpc-with-subnets.yaml) and
   [adding the EC2s](./cloudformation-samples/two-ec2s-in-private-subnet.yaml).
+  See also a [code pipeline](./cloudformation-samples/codepipeline.yaml) to
+  manage the release of a website.
 
 
 ## Deploying the Stacks
