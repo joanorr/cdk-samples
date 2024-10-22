@@ -2,13 +2,16 @@
 
 Parameters:
   GitHubCodeConnectionArn:
-    Description: The ARN of the CodeConnection resource for my GitHuib account.
+    Description: The ARN of the CodeConnection resource for the GitHub account.
     Type: String
   GitHubRepositoryId:
     Description: The GitHub repository which holds the project to be built.
     Type: String
-  WebsiteBuilderDockerImageUri:
-    Description: The URI of the ECR Docker image for the website builder.
+  WebsiteBuilderDockerImageName:
+    Description: The name of the ECR Docker image for the website builder.
+    Type: String
+  WebsiteApproverlEmail:
+    Description: The email of the approver for pushing to prod
     Type: String
 
 Resources:
@@ -49,6 +52,10 @@ Resources:
                   - !GetAtt BuildWebsite.Arn
                   - !GetAtt PushWebsiteToStaging.Arn
                   - !GetAtt PushWebsiteToProd.Arn
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref WebsitePendingReviewSnsTopic
 
   BuildWebsiteServiceRole:
     Type: AWS::IAM::Role
@@ -86,7 +93,9 @@ Resources:
                   - ecr:BatchGetImage
                   - ecr:BatchCheckLayerAvailability
                   - ecr:GetDownloadUrlForLayer
-                Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/website-builder
+                Resource: !Sub
+                  - arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${ImageName}
+                  - ImageName: !Ref WebsiteBuilderDockerImageName
               - Effect: Allow
                 Action:
                   - s3:GetObject
@@ -181,6 +190,11 @@ Resources:
                 Resource: !Sub
                   - "arn:aws:s3:::${BucketName}/*"
                   - BucketName: !ImportValue ProdWebsiteBucket
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                Resource:
+                  - "arn:aws:cloudfront::381492290251:distribution/E1V19FN3MUEA6S"
 
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -241,6 +255,9 @@ Resources:
                 Version: "1"
                 Owner: AWS
                 Provider: Manual
+              Configuration:
+                NotificationArn: !Ref WebsitePendingReviewSnsTopic
+                ExternalEntityLink: !ImportValue StagingWebsiteUrl
             - Name: PushToProd
               RunOrder: 2
               ActionTypeId:
@@ -259,7 +276,7 @@ Resources:
             Push:
               - Branches:
                   Includes:
-                    - "master"
+                    - master
 
   BuildWebsite:
     Type: AWS::CodeBuild::Project
@@ -272,7 +289,9 @@ Resources:
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
-        Image: !Ref WebsiteBuilderDockerImageUri
+        Image: !Sub
+          - ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ImageName}:latest
+          - ImageName: !Ref WebsiteBuilderDockerImageName
         # Required in order for the service role permissions to be used to pull
         # the Docker image.
         # See https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-codebuild-project-environment.html#cfn-codebuild-project-environment-imagepullcredentialstype
@@ -311,6 +330,7 @@ Resources:
               build:
                 commands:
                   - aws s3 sync . s3://${WebsiteBucket} --delete
+                  - aws cloudfront create-invalidation --distribution-id E1V19FN3MUEA6S --paths '/*'
           - WebsiteBucket: !ImportValue ProdWebsiteBucket
       Artifacts:
         Type: CODEPIPELINE
@@ -319,3 +339,14 @@ Resources:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+
+  WebsitePendingReviewSnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Website update pending approval
+  WebsitePendingReviewSnsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref WebsiteApproverlEmail
+      TopicArn: !Ref WebsitePendingReviewSnsTopic
